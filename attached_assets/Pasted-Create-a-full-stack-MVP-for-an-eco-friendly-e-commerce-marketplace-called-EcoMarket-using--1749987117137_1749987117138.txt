@@ -1,0 +1,52 @@
+Create a full-stack MVP for an eco-friendly e-commerce marketplace called "EcoMarket" using:
+
+👨‍💻 Backend:
+- Use Java with Spring Boot.
+- Connect to PostgreSQL (can use mock in-memory DB for now).
+- Build RESTful APIs for:
+  1. **Customer APIs**:
+     - GET /products: list all products with filters (category, seller, price).
+     - GET /products/{id}: fetch product details with CO2 impact, eco-certification.
+     - POST /cart: add product to user's cart.
+     - GET /cart: get cart items.
+     - POST /checkout: place order, integrate mock Razorpay/Cashfree.
+     - GET /orders: view past orders + total CO2 saved.
+  2. **Seller APIs**:
+     - POST /sellers/register: register seller with eco-certification upload.
+     - POST /products: add new product (CRUD).
+     - GET /seller/orders: view & update shipping status.
+  3. **User APIs**:
+     - POST /auth/signup & /auth/login (email and Google OAuth)
+     - GET /user/profile: show total CO2 saved, points earned.
+
+- Include data models for User, Seller, Product, Order, Cart, CO2Contribution.
+- Add initial seed data for products & sellers.
+
+🌐 Frontend (ReactJS + TailwindCSS):
+- Build two main views:
+  1. **Customer Web App**:
+     - Homepage with featured eco-products
+     - Product listing page with filters (category, seller, price)
+     - Product detail page showing description, price, eco-certification, and CO2 saved
+     - Shopping cart page
+     - Checkout page (mock Razorpay)
+     - Order history with CO2 saved tracker
+     - Login/signup (email & Google)
+     - Navbar, Footer, Responsive UI
+
+  2. **Seller Dashboard**:
+     - Seller registration page with eco-cert upload
+     - Dashboard with product list (CRUD)
+     - Order list with delivery status update
+
+📊 Additional Features:
+- For each purchase, calculate and show estimated CO2 saved.
+- Add a "points" system for users: 1 point per 1kg CO2 saved.
+- Allow users to donate points to plant trees (dummy option for now).
+- Track and show company-wide CO2 contribution (if email domain is corporate).
+
+🔧 Deployment:
+- Bundle everything into a single Replit project.
+- Use local memory or SQLite initially; mock integrations where needed.
+
+Keep code modular and readable with comments for each route and component.
