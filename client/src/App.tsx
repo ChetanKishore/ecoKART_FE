@@ -6,12 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
-import Home from "@/pages/home";
+import BuyerDashboard from "@/pages/buyer-dashboard";
+import SellerHome from "@/pages/seller-home";
 import ProductDetail from "@/pages/product-detail";
 import Cart from "@/pages/cart";
 import Checkout from "@/pages/checkout";
 import Orders from "@/pages/orders";
 import SellerDashboard from "@/pages/seller-dashboard";
+import CompanyDashboard from "@/pages/company-dashboard";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -22,12 +24,14 @@ function Router() {
         <Route path="/" component={Landing} />
       ) : (
         <>
-          <Route path="/" component={Home} />
+          <Route path="/" component={BuyerDashboard} />
+          <Route path="/seller" component={SellerHome} />
+          <Route path="/seller/dashboard" component={SellerDashboard} />
           <Route path="/product/:id" component={ProductDetail} />
           <Route path="/cart" component={Cart} />
           <Route path="/checkout" component={Checkout} />
           <Route path="/orders" component={Orders} />
-          <Route path="/seller" component={SellerDashboard} />
+          <Route path="/company-dashboard" component={CompanyDashboard} />
         </>
       )}
       <Route component={NotFound} />

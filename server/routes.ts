@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
-import { categories as categoriesTable, sellers as sellersTable, products as productsTable } from "@shared/schema";
+import { categories as categoriesTable, sellers as sellersTable, products as productsTable, users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import {
   insertSellerSchema,
   insertProductSchema,
@@ -323,6 +324,325 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company stats:", error);
       res.status(500).json({ message: "Failed to fetch company stats" });
+    }
+  });
+
+  // Seller registration endpoint
+  app.post('/api/sellers/register', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userEmail = req.user.claims.email;
+      
+      // Check if user is already a seller
+      const existingSeller = await storage.getSellerByUserId(userId);
+      if (existingSeller) {
+        return res.status(400).json({ message: "User is already registered as a seller" });
+      }
+
+      const result = insertSellerSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid seller data", errors: result.error.errors });
+      }
+
+      const seller = await storage.createSeller({
+        ...result.data,
+        userId,
+        isVerified: false // New sellers need verification
+      });
+
+      res.status(201).json(seller);
+    } catch (error) {
+      console.error("Error registering seller:", error);
+      res.status(500).json({ message: "Failed to register seller" });
+    }
+  });
+
+  // Seller API endpoints
+  app.get('/api/sellers/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Not registered as a seller" });
+      }
+      res.json(seller);
+    } catch (error) {
+      console.error("Error fetching seller profile:", error);
+      res.status(500).json({ message: "Failed to fetch seller profile" });
+    }
+  });
+
+  app.get('/api/sellers/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      const products = await storage.getProductsBySeller(seller.id);
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching seller products:", error);
+      res.status(500).json({ message: "Failed to fetch seller products" });
+    }
+  });
+
+  app.post('/api/sellers/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      const result = insertProductSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });
+      }
+
+      const product = await storage.createProduct({
+        ...result.data,
+        sellerId: seller.id,
+        isActive: true,
+        isVerified: false // New products need verification
+      });
+
+      res.status(201).json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.patch('/api/sellers/products/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      if (!product || product.sellerId !== seller.id) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const result = insertProductSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });
+      }
+
+      await storage.updateProduct(productId, result.data);
+      res.json({ message: "Product updated successfully" });
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete('/api/sellers/products/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      if (!product || product.sellerId !== seller.id) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      await storage.deleteProduct(productId);
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  app.get('/api/sellers/orders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seller = await storage.getSellerByUserId(userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      const orders = await storage.getOrdersBySeller(seller.id);
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching seller orders:", error);
+      res.status(500).json({ message: "Failed to fetch seller orders" });
+    }
+  });
+
+  // Product verification endpoint (for admin use)
+  app.post('/api/admin/verify-product/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { approved, notes } = req.body;
+      
+      await storage.verifyProduct(productId, approved, notes || "");
+      res.json({ message: "Product verification updated successfully" });
+    } catch (error) {
+      console.error("Error verifying product:", error);
+      res.status(500).json({ message: "Failed to verify product" });
+    }
+  });
+
+  // Company API routes
+  app.get('/api/company/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const company = await storage.getCompanyByUserId(userId);
+      
+      if (!company) {
+        // Create a default company based on user's email domain
+        const userEmail = req.user.claims.email;
+        if (!userEmail) {
+          return res.status(400).json({ message: "Email not available" });
+        }
+        
+        const domain = userEmail.split('@')[1];
+        let existingCompany = await storage.getCompanyByDomain(domain);
+        
+        if (!existingCompany) {
+          // Create new company
+          existingCompany = await storage.createCompany({
+            name: domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1),
+            domain: domain,
+            industry: "Technology",
+          });
+        }
+        
+        // Associate user with company
+        await storage.addEmployeeToCompany(userId, existingCompany.id);
+        return res.json(existingCompany);
+      }
+      
+      res.json(company);
+    } catch (error) {
+      console.error("Error fetching company profile:", error);
+      res.status(500).json({ message: "Failed to fetch company profile" });
+    }
+  });
+
+  app.get('/api/company/employees/:timeRange?', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const company = await storage.getCompanyByUserId(userId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      const employees = await storage.getCompanyEmployees(company.id);
+      res.json(employees);
+    } catch (error) {
+      console.error("Error fetching company employees:", error);
+      res.status(500).json({ message: "Failed to fetch company employees" });
+    }
+  });
+
+  app.get('/api/company/stats/:timeRange?', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const company = await storage.getCompanyByUserId(userId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      const stats = await storage.getCompanyStats(company.id);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching company stats:", error);
+      res.status(500).json({ message: "Failed to fetch company stats" });
+    }
+  });
+
+  app.get('/api/company/points-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const company = await storage.getCompanyByUserId(userId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      const history = await storage.getCompanyPointsHistory(company.id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching company points history:", error);
+      res.status(500).json({ message: "Failed to fetch company points history" });
+    }
+  });
+
+  app.post('/api/company/employees', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      const company = await storage.getCompanyByUserId(userId);
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      // Find user by email
+      const userResult = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (userResult.length === 0) {
+        return res.status(404).json({ message: "User with this email not found" });
+      }
+      
+      const foundUser = userResult[0];
+      
+      // Check if user already belongs to a company
+      if (foundUser.companyId && foundUser.companyId !== company.id) {
+        return res.status(400).json({ message: "User already belongs to another company" });
+      }
+      
+      // Add employee to company
+      await storage.addEmployeeToCompany(foundUser.id, company.id);
+      res.json({ message: "Employee added successfully" });
+    } catch (error) {
+      console.error("Error adding employee:", error);
+      res.status(500).json({ message: "Failed to add employee" });
+    }
+  });
+
+  app.post('/api/company/redeem-points', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { points, action } = req.body;
+      
+      if (!points || points < 100) {
+        return res.status(400).json({ message: "Minimum 100 points required for redemption" });
+      }
+      
+      const company = await storage.getCompanyByUserId(userId);
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      if ((company.totalPoints || 0) < points) {
+        return res.status(400).json({ message: "Insufficient points" });
+      }
+      
+      const description = action === 'plant_trees' 
+        ? `Redeemed ${points} points to plant ${Math.floor(points / 20)} trees`
+        : `Redeemed ${points} points`;
+      
+      await storage.redeemCompanyPoints(company.id, points, description);
+      res.json({ message: "Points redeemed successfully" });
+    } catch (error) {
+      console.error("Error redeeming points:", error);
+      res.status(500).json({ message: "Failed to redeem points" });
     }
   });
 

@@ -34,8 +34,30 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   totalPoints: integer("total_points").default(0),
   totalCo2Saved: decimal("total_co2_saved", { precision: 10, scale: 2 }).default("0"),
+  companyId: integer("company_id").references(() => companies.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const companies = pgTable("companies", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  domain: varchar("domain").notNull().unique(),
+  industry: varchar("industry"),
+  logoUrl: varchar("logo_url"),
+  totalPoints: integer("total_points").default(0),
+  totalCo2Saved: decimal("total_co2_saved", { precision: 10, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const companyPointsHistory = pgTable("company_points_history", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id),
+  action: varchar("action").notNull(), // 'earned' or 'redeemed'
+  points: integer("points").notNull(),
+  description: varchar("description").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const sellers = pgTable("sellers", {
@@ -117,6 +139,10 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   carts: many(carts),
   orders: many(orders),
   co2Contributions: many(co2Contributions),
+  company: one(companies, {
+    fields: [users.companyId],
+    references: [companies.id],
+  }),
 }));
 
 export const sellersRelations = relations(sellers, ({ one, many }) => ({
@@ -125,6 +151,18 @@ export const sellersRelations = relations(sellers, ({ one, many }) => ({
     references: [users.id],
   }),
   products: many(products),
+}));
+
+export const companiesRelations = relations(companies, ({ many }) => ({
+  employees: many(users),
+  pointsHistory: many(companyPointsHistory),
+}));
+
+export const companyPointsHistoryRelations = relations(companyPointsHistory, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyPointsHistory.companyId],
+    references: [companies.id],
+  }),
 }));
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
@@ -227,6 +265,17 @@ export const insertCo2ContributionSchema = createInsertSchema(co2Contributions).
   createdAt: true,
 });
 
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCompanyPointsHistorySchema = createInsertSchema(companyPointsHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -242,4 +291,8 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertCo2Contribution = z.infer<typeof insertCo2ContributionSchema>;
 export type Co2Contribution = typeof co2Contributions.$inferSelect;
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+export type InsertCompanyPointsHistory = z.infer<typeof insertCompanyPointsHistorySchema>;
+export type CompanyPointsHistory = typeof companyPointsHistory.$inferSelect;
 export type Category = typeof categories.$inferSelect;

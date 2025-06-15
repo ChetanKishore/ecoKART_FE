@@ -43,11 +43,13 @@ The application follows a monorepo structure with clear separation between clien
 ### API Structure
 RESTful API with the following main endpoints:
 - `/api/auth/*` - Authentication routes
-- `/api/products` - Product catalog management
+- `/api/products` - Product catalog management (buyers see only verified products)
 - `/api/cart` - Shopping cart operations
 - `/api/orders` - Order management
 - `/api/stats` - User and global statistics
-- `/api/sellers` - Seller management and verification
+- `/api/sellers/*` - Seller registration, product management, and verification
+- `/api/admin/*` - Product verification and admin functions
+- `/api/company/*` - Company dashboard, employee management, and points redemption
 
 ### Frontend Architecture
 - Component-based React architecture
@@ -67,16 +69,30 @@ RESTful API with the following main endpoints:
 6. **Order Tracking**: View order history and environmental impact
 
 ### Seller Journey
-1. **Registration**: Apply to become a verified seller
-2. **Verification**: Submit sustainability certifications
-3. **Product Management**: Add/edit products with CO2 metrics
-4. **Dashboard**: Track sales and environmental impact
+1. **Registration**: Apply to become a verified seller with business credentials
+2. **Account Verification**: Admin reviews seller application and certifications
+3. **Product Management**: Add/edit products with sustainability metrics
+4. **Product Verification**: All products reviewed for sustainability compliance
+5. **Dashboard**: Track sales, verification status, and environmental impact
+
+### Company Journey
+1. **Auto-Organization**: Users automatically grouped by email domain
+2. **Dashboard Access**: View company-wide environmental impact metrics
+3. **Employee Tracking**: Monitor individual employee CO2 savings and purchases
+4. **Points Management**: Redeem company points for environmental initiatives
+5. **Team Management**: Add employees to company organization
+6. **Impact Reporting**: Track collective sustainability achievements
 
 ### Data Processing
 - Real-time CO2 impact calculations
 - Points system for eco-friendly purchases
 - Global statistics aggregation
 - Product search and filtering
+- Seller registration and verification system
+- Product verification for sustainability compliance
+- Company dashboard for organizational environmental tracking
+- Employee CO2 impact aggregation by company domain
+- Company points management and redemption system
 
 ## External Dependencies
 
@@ -125,6 +141,7 @@ RESTful API with the following main endpoints:
 ```
 Changelog:
 - June 15, 2025. Initial setup
+- June 15, 2025. Added Company Dashboard feature with organizational environmental tracking
 ```
 
 ## User Preferences

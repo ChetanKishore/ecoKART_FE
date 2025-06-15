@@ -7,6 +7,8 @@ import {
   orders,
   orderItems,
   co2Contributions,
+  companies,
+  companyPointsHistory,
   type User,
   type UpsertUser,
   type InsertSeller,
@@ -22,6 +24,10 @@ import {
   type OrderItem,
   type InsertCo2Contribution,
   type Co2Contribution,
+  type InsertCompany,
+  type Company,
+  type InsertCompanyPointsHistory,
+  type CompanyPointsHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -67,6 +73,18 @@ export interface IStorage {
   getUserCo2Stats(userId: string): Promise<{ totalCo2Saved: string; totalPoints: number }>;
   getGlobalCo2Stats(): Promise<{ totalCo2Saved: string; treesPlanted: number; activeUsers: number }>;
   getCompanyCo2Stats(domain: string): Promise<{ totalCo2Saved: string }>;
+
+  // Company operations
+  createCompany(company: InsertCompany): Promise<Company>;
+  getCompanyByDomain(domain: string): Promise<Company | undefined>;
+  getCompanyByUserId(userId: string): Promise<Company | undefined>;
+  updateCompanyStats(companyId: number, points: number, co2Saved: string): Promise<void>;
+  getCompanyEmployees(companyId: number): Promise<Array<User & { orderCount: number }>>;
+  getCompanyStats(companyId: number): Promise<{ totalEmployees: number; totalOrders: number; totalCo2Saved: string; totalPoints: number; pointsRedeemed: number }>;
+  addEmployeeToCompany(userId: string, companyId: number): Promise<void>;
+  createCompanyPointsHistory(history: InsertCompanyPointsHistory): Promise<CompanyPointsHistory>;
+  getCompanyPointsHistory(companyId: number): Promise<CompanyPointsHistory[]>;
+  redeemCompanyPoints(companyId: number, points: number, description: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -351,6 +369,153 @@ export class DatabaseStorage implements IStorage {
         verificationNotes: notes,
       })
       .where(eq(products.id, id));
+  }
+
+  // Company operations
+  async createCompany(company: InsertCompany): Promise<Company> {
+    const [newCompany] = await db
+      .insert(companies)
+      .values(company)
+      .returning();
+    return newCompany;
+  }
+
+  async getCompanyByDomain(domain: string): Promise<Company | undefined> {
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.domain, domain));
+    return company;
+  }
+
+  async getCompanyByUserId(userId: string): Promise<Company | undefined> {
+    const [result] = await db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        domain: companies.domain,
+        industry: companies.industry,
+        logoUrl: companies.logoUrl,
+        totalPoints: companies.totalPoints,
+        totalCo2Saved: companies.totalCo2Saved,
+        createdAt: companies.createdAt,
+        updatedAt: companies.updatedAt,
+      })
+      .from(companies)
+      .innerJoin(users, eq(users.companyId, companies.id))
+      .where(eq(users.id, userId));
+    return result;
+  }
+
+  async updateCompanyStats(companyId: number, points: number, co2Saved: string): Promise<void> {
+    await db
+      .update(companies)
+      .set({
+        totalPoints: sql`${companies.totalPoints} + ${points}`,
+        totalCo2Saved: sql`${companies.totalCo2Saved} + ${co2Saved}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(companies.id, companyId));
+  }
+
+  async getCompanyEmployees(companyId: number): Promise<Array<User & { orderCount: number }>> {
+    const employees = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        totalPoints: users.totalPoints,
+        totalCo2Saved: users.totalCo2Saved,
+        companyId: users.companyId,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+        orderCount: sql<number>`COALESCE(COUNT(${orders.id}), 0)`,
+      })
+      .from(users)
+      .leftJoin(orders, eq(orders.userId, users.id))
+      .where(eq(users.companyId, companyId))
+      .groupBy(users.id);
+    
+    return employees;
+  }
+
+  async getCompanyStats(companyId: number): Promise<{ totalEmployees: number; totalOrders: number; totalCo2Saved: string; totalPoints: number; pointsRedeemed: number }> {
+    const [employeeStats] = await db
+      .select({
+        totalEmployees: sql<number>`COUNT(DISTINCT ${users.id})`,
+        totalOrders: sql<number>`COUNT(${orders.id})`,
+        totalCo2Saved: sql<string>`COALESCE(SUM(${users.totalCo2Saved}), 0)`,
+        totalPoints: sql<number>`COALESCE(SUM(${users.totalPoints}), 0)`,
+      })
+      .from(users)
+      .leftJoin(orders, eq(orders.userId, users.id))
+      .where(eq(users.companyId, companyId));
+
+    const [redeemedStats] = await db
+      .select({
+        pointsRedeemed: sql<number>`COALESCE(SUM(${companyPointsHistory.points}), 0)`,
+      })
+      .from(companyPointsHistory)
+      .where(and(
+        eq(companyPointsHistory.companyId, companyId),
+        eq(companyPointsHistory.action, 'redeemed')
+      ));
+
+    return {
+      totalEmployees: employeeStats?.totalEmployees || 0,
+      totalOrders: employeeStats?.totalOrders || 0,
+      totalCo2Saved: employeeStats?.totalCo2Saved || "0",
+      totalPoints: employeeStats?.totalPoints || 0,
+      pointsRedeemed: redeemedStats?.pointsRedeemed || 0,
+    };
+  }
+
+  async addEmployeeToCompany(userId: string, companyId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ companyId })
+      .where(eq(users.id, userId));
+  }
+
+  async createCompanyPointsHistory(history: InsertCompanyPointsHistory): Promise<CompanyPointsHistory> {
+    const [newHistory] = await db
+      .insert(companyPointsHistory)
+      .values(history)
+      .returning();
+    return newHistory;
+  }
+
+  async getCompanyPointsHistory(companyId: number): Promise<CompanyPointsHistory[]> {
+    return await db
+      .select()
+      .from(companyPointsHistory)
+      .where(eq(companyPointsHistory.companyId, companyId))
+      .orderBy(desc(companyPointsHistory.createdAt));
+  }
+
+  async redeemCompanyPoints(companyId: number, points: number, description: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Deduct points from company
+      await tx
+        .update(companies)
+        .set({
+          totalPoints: sql`${companies.totalPoints} - ${points}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(companies.id, companyId));
+
+      // Record the redemption
+      await tx
+        .insert(companyPointsHistory)
+        .values({
+          companyId,
+          action: 'redeemed',
+          points,
+          description,
+        });
+    });
   }
 }
 

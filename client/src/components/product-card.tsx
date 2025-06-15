@@ -84,7 +84,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <img
             src={product.imageUrl || "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300"}
             alt={product.name}
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-40 md:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
           />
           {product.stock === 0 && (
             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
