@@ -12,15 +12,22 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const baseUrl = import.meta.env.PROD ? "" : "http://localhost:8080";
+  const res = await fetch(`${baseUrl}${url}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      "Content-Type": "application/json",
+      ...(getAuthToken() ? { "Authorization": `Bearer ${getAuthToken()}` } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
   return res;
+}
+
+function getAuthToken(): string | null {
+  return localStorage.getItem("authToken");
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -29,8 +36,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
+    const baseUrl = import.meta.env.PROD ? "" : "http://localhost:8080";
+    const res = await fetch(`${baseUrl}${queryKey[0] as string}`, {
+      headers: {
+        ...(getAuthToken() ? { "Authorization": `Bearer ${getAuthToken()}` } : {}),
+      },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

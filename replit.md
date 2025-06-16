@@ -8,23 +8,23 @@ ecoKART is a sustainable e-commerce platform built as a full-stack web applicati
 
 ### Technology Stack
 - **Frontend**: React 18 with TypeScript, Vite for build tooling
-- **Backend**: Node.js with Express.js
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Replit Auth with OpenID Connect
+- **Backend**: Spring Boot with Java 17
+- **Database**: PostgreSQL with Spring Data JPA
+- **Authentication**: Custom JWT authentication with Spring Security
 - **UI Components**: shadcn/ui with Radix UI primitives
 - **Styling**: Tailwind CSS with custom eco-friendly color scheme
 - **State Management**: TanStack Query for server state management
 - **Routing**: Wouter for client-side routing
 
 ### Architecture Pattern
-The application follows a monorepo structure with clear separation between client, server, and shared code:
+The application follows a monorepo structure with clear separation between client, backend, and shared code:
 - `client/` - React frontend application
-- `server/` - Express.js backend API
-- `shared/` - Common schemas and types shared between frontend and backend
+- `backend/` - Spring Boot backend API
+- `shared/` - Common schemas and types (transitioning to Spring Boot DTOs)
 
 ## Key Components
 
-### Database Schema (PostgreSQL + Drizzle)
+### Database Schema (PostgreSQL + JPA)
 - **Users**: User profiles with eco-impact tracking (total points, CO2 saved)
 - **Sellers**: Business verification system with certification tracking
 - **Categories**: Product categorization system
@@ -32,17 +32,17 @@ The application follows a monorepo structure with clear separation between clien
 - **Shopping Cart**: User cart management
 - **Orders**: Order processing and tracking
 - **CO2 Contributions**: Environmental impact tracking per transaction
-- **Sessions**: Secure session management for authentication
+- **Companies**: Company organization and employee management
 
 ### Authentication System
-- Replit Auth integration with OpenID Connect
-- Session-based authentication using PostgreSQL session store
-- Secure cookie management with HTTP-only flags
-- User profile management with automatic user creation
+- Custom JWT authentication with Spring Security
+- Email/phone number login with password encryption
+- HTTP-only cookie management for secure token storage
+- User registration and profile management
 
 ### API Structure
-RESTful API with the following main endpoints:
-- `/api/auth/*` - Authentication routes
+RESTful API with Spring Boot endpoints:
+- `/api/auth/*` - Authentication with JWT tokens
 - `/api/products` - Product catalog management (buyers see only verified products)
 - `/api/cart` - Shopping cart operations
 - `/api/orders` - Order management
@@ -142,6 +142,12 @@ RESTful API with the following main endpoints:
 Changelog:
 - June 15, 2025. Initial setup
 - June 15, 2025. Added Company Dashboard feature with organizational environmental tracking
+- June 16, 2025. Migrated backend from Node.js/Express to Spring Boot with Java 17
+- June 16, 2025. Implemented custom JWT authentication system with Spring Security
+- June 16, 2025. Created comprehensive Spring Boot project structure with JPA entities
+- June 16, 2025. Completed Node.js to Spring Boot migration with in-memory authentication
+- June 16, 2025. Successfully removed all Node.js server components and dependencies
+- June 16, 2025. Spring Boot backend running on port 8080, React frontend on port 5000
 ```
 
 ## User Preferences

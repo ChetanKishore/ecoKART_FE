@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-jwt-key}
+  expiration: 604800000

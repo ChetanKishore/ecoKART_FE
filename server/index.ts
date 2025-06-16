@@ -1,70 +1,47 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+// Temporary bridge script for workflow compatibility
+// The actual backend is now Spring Boot Java running on port 8080
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+import { spawn } from 'child_process';
+import path from 'path';
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+console.log('🌱 EcoMarket Development Server');
+console.log('Backend: Spring Boot (Java) on port 8080');
+console.log('Frontend: React + Vite on port 5000');
+console.log('─'.repeat(50));
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+// Start Spring Boot backend
+const backend = spawn('mvn', ['spring-boot:run'], {
+  cwd: path.join(process.cwd(), 'backend'),
+  stdio: 'inherit'
+});
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+// Start React frontend after backend starts
+setTimeout(() => {
+  const frontend = spawn('npx', [
+    'vite', 
+    '--host', '0.0.0.0', 
+    '--port', '5000',
+    '--force'
+  ], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      VITE_ALLOWED_HOSTS: 'all'
     }
   });
 
-  next();
+  frontend.on('error', (err) => {
+    console.error('Frontend error:', err);
+  });
+}, 10000);
+
+backend.on('error', (err) => {
+  console.error('Backend error:', err);
 });
 
-(async () => {
-  const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+// Handle cleanup
+process.on('SIGINT', () => {
+  console.log('\nShutting down servers...');
+  backend.kill();
+  process.exit(0);
+});
